@@ -13,36 +13,61 @@ from datetime import timedelta
 import json
 import os, sys, time, calendar
 
-def main(setting_uri='setting/ikioi_setting.json'):
+def main():
     # 勢い計測実施
     ikioiMaesure()
 
 # 勢い計測のメインクラス
-def ikioiMaesure():
+def ikioiMaesure(setting_uri='setting/ikioi_setting.json'):
     # 設定読み込み
-    search_set = readSetting("setting/ikioi_setting.json")
-    
+    search_set = readSetting(setting_uri)
     # 初期化
     # 検索キーワード
     key_list = search_set.keys()
     # 結果辞書
     ikioi_result = {}
+    # 結果
+    result_set = {}
+    '''
+    ----追記イメージ----
+    "東山奈央":{
+        "2019/04/12_10:00:00":{
+            "scope":"60",
+            "count":"5",
+            "ikioi":"1200.0",
+        }
+        →ここに追加
+        "YYYY/MM/DD_HH:MM:SS":{
+            data
+        }
+    }
+    --------------------
+    '''
+    # key用タイムスタンプ取得
+    key_time = getTimestamp()
+    
     for key in key_list:
-        ikioi_result[search_set[key]['keyword']] = {}
-
+        search_word = search_set[key]['keyword']
+        ikioi_result[search_word] = {key_time:{}}
+        
+    print(json.dumps(ikioi_result, sort_keys=True, indent=4, ensure_ascii=False))
+    
     # 検索処理  設定されたキーワード分繰り返す
     for key in key_list:
         # 設定１つに対して勢い検索を実施
-        result = ikioiSearch(search_set[key])
-    
+        search_set[key]['keytime'] = key_time
+        search_setting = search_set[key]
+        search_word = search_set[key]['keyword']
+        
+        result = ikioiSearch(search_setting)
         # 計算処理
         # 辞書形式で格納
-        ikioi_result[key] = ikioiCalc(search_set[key], result)
+        ikioi_result[search_word][key_time] = ikioiCalc(search_setting, result)
+        # 結果記録
+#         print(json.dumps(ikioi_result, sort_keys=True, indent=4, ensure_ascii=False))
+        result_set = writeResult(search_setting, ikioi_result[search_word])
     
-    # 結果記録
-    result = writeResult(ikioi_result)
-    
-    return result
+    return result_set
 
 # 設定ファイル読み込み
 def readSetting(setting_uri):
@@ -75,108 +100,122 @@ def ikioiSearch(set):
         'result_type':'recent',
         'count':100
         }
-    
-    # 検索実施
-    print('----検索')
-    res = twitter.get(url, params = params)
-    print ('アクセス可能回数 %s' % res.headers['X-Rate-Limit-Remaining'])
-    print ('リセット時間 %s' % res.headers['X-Rate-Limit-Reset'])
-    
-    res_text = json.loads(res.text)
-#     writer = open('result/tweet.json', 'w', encoding='utf-8')
-#     json.dump(res_text, writer, indent=8, ensure_ascii=False)
-    
-    # 再検索判定
-    print('----再検索判定')
-    # 取得件数
-    count = len(res_text['statuses'])
-    # 取得した最古投稿時間
-    last_get_created_at = res_text['statuses'][count-1]['created_at']
-    # 比較可能な形式に整形
-    last_created_at = createdAtToParamStr(last_get_created_at)
-    # 現在時刻 (now)
-    now_str = dateTimeToParamStr(datetime.now())
+    '''
+    ★★★★★こっから★★★★★
+    '''
+    '''
+    old_created_at > scope_dateである間取得
+    取得データを蓄積する
+    '''
+    # 取得したツイートの最古投稿時間
+    old_created_at = True
     # 対象時刻 (scope)
-    scope_date_str = \
-        dateTimeToParamStr(datetime.now(), minutes=int(set['scope']), is_plus=False)
+    scope_date = True
+    # 取得したツイートの一時記録領域
+    tmp_result = {'created_at':[], 'text':[]}
+    # 取得したツイートの合計件数
+    total_count = 0
     
-    print("取得件数   : " + str(count) + "件")
-    print("created_at : " + last_created_at)
-    print("nowStr     : " + now_str)
-    print("scopeStr   : " + scope_date_str)
+    '''
+    取得部
+    '''
+    print('----検索開始')
     
-    if scope_date_str <= last_created_at:
-        # True => 再検索
-        do_research = True
-    else:    
-        # False => 結果を絞る
-        do_research = False
-    
-    
-    if do_research == True:
-        # 検索範囲が不足している場合、追加で検索
-        print('----再検索実施')
-        params['until'] = last_created_at
-        # TODO scopeを広げてテスト
+    while True:
+        # 検索実施
         print(params)
-        sys.exit()
-     
-    else:
-        # 検索範囲が超過している場合、結果を絞る
-        print('----結果絞り込み')
-        # 新しいものから順番に読み込み
-        # scope内 => スキップ
-        # scope外 => 対象数を増加
-        # 
-        for data in res_text['statuses']:
-            created_at_str = createdAtToParamStr(data['created_at'])
+        res = twitter.get(url, params = params)
+        res_text = json.loads(res.text)
+        if res.headers['X-Rate-Limit-Remaining'] is not None:
+            print ('アクセス可能回数 %s' % res.headers['X-Rate-Limit-Remaining'])
+            print ('リセット時間 %s' % res.headers['X-Rate-Limit-Reset'])
+        else:
+            print('ヘッダが正常に取得できませんでした')
+        
+        # 結果を結果リストに追加
+        for tweet_data in res_text['statuses']:
+            tmp_result['created_at'].append(tweet_data['created_at'])
+            tmp_result['text'].append(tweet_data['text'])
+#             print('--------------------')
+#             print(str(len(tmp_result['created_at'])))
+#             print(tmp_result['created_at'])
+#             print(str(len(tmp_result['text'])))
+        
+        total_count = len(tmp_result['created_at'])
+        
+        # 最古投稿時間を設定
+        old_created_at = tmp_result['created_at'][total_count-1]
+        # 比較可能な形式に整形
+        old_created_at_param = createdAtToParamStr(old_created_at)
+        # 現在時刻 (now)
+        now_date = dateTimeToParamStr(datetime.now())
+        # 対象時刻 (scope)
+        scope_date = dateTimeToParamStr(datetime.now(), minutes=int(set['scope']))
+        
+        # 判定出力
+        print("取得件数   : " + str(total_count) + "件")
+        print("created_at : " + old_created_at_param)
+        print("now_date     : " + now_date)
+        print("scope_date   : " + scope_date)
+        
+        # 再検索判定
+        print('----再検索判定')
+        if old_created_at_param > scope_date:
+            # 再検索用パラメータを設定
+            params['until'] = old_created_at_param
             
-            if scope_date_str > created_at_str:
-                # 以降を対象にしない
-                break
-            # 計測の対象件数
-            ikioi_target_count += 1
+        else:
+            print('----検索終了')
+            break
+
+    '''
+    カウント部
+    '''
+    # 結果を絞る
+    print('----結果絞り込み')
+    # 新しいものから順番に読み込み
+    # scope内 => スキップ
+    # scope外 => 対象数を増加
+    # 
+    for data in tmp_result['created_at']:
+        created_at_str = createdAtToParamStr(data)
+        
+        if scope_date > created_at_str:
+            # 以降を対象にしない
+            break
+        # 計測の対象件数
+        ikioi_target_count += 1
     
     return ikioi_target_count
 
 # 勢い計算処理
-def ikioiCalc(set, count):
-    record_date = str(datetime.now())
-    ikioi = (1440 / int(set['scope'])) * count
+def ikioiCalc(search_setting, count):
+    ikioi = (1440 / int(search_setting['scope'])) * count
     ikioi_result = {
-        'report_date':record_date,
-        'keyword':set['keyword'],
-        'scope':set['scope'],
-        'count':count,
-        'ikioi':ikioi,
+        'scope':search_setting['scope'],
+        'count':str(count),
+        'ikioi':str(ikioi),
         }
     print(ikioi_result)
     return ikioi_result
 
 # 結果をファイルの末尾に追加
-def writeResult(report_list):
+def writeResult(search_setting, report):
     path = 'result/ikioi_report.json'
-    
-    
-    # TODO 
+     
     # 読み込み用
     fr = open(path, 'r', encoding='utf-8')
     report_r = json.load(fr)
     
+    report_r[search_setting['keyword']][search_setting['keytime']] = report[search_setting['keytime']]
+    
     # 書き込み用
+    print('----結果書き込み')
+    print(json.dumps(report_r, sort_keys=True, indent=4, ensure_ascii=False))
     report_w = open(path, 'w', encoding='utf-8')
-    
-    # レポート件数
-    report_count = len(report_r)
-    
-    for report in report_list:
-        report_r.setdefault(report_count, report)
-        report_count += 1
-        print(report_r)
+    result = json.dump(report_r, report_w, sort_keys=True, indent=4, ensure_ascii=False)
         
-#     json.dump(report_r, report_w, indent=8, ensure_ascii=False)
-    
-    return True
+    return result
 
 # Twitterから取得できる日付の形式から
 # 比較可能かつ、params['until']に設定可能な形式に変換する
@@ -222,6 +261,13 @@ def dateTimeToParamStr(datetime, minutes=0, is_plus=False):
     datetime_str = aware_time.strftime("%Y-%m-%d_%H:%M:%S_%Z")
     
     return datetime_str
+
+# レポートキーに使用するタイムスタンプを取得する
+def getTimestamp():
+    now = datetime.now()
+    format = '%Y/%m/%d_%H:%M:%S'
+    key_timestamp = now.strftime(format)
+    return key_timestamp
 
 # twitterセッション取得
 def createSession():
