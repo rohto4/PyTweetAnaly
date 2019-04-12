@@ -6,12 +6,11 @@ Created on 2019/04/10
 '''
 
 from requests_oauthlib import OAuth1Session
-from pytz import utc
 from tzlocal import get_localzone
 from datetime import datetime
 from datetime import timedelta
 import json
-import os, sys, time, calendar
+import os, time, calendar
 
 def main():
     # 勢い計測実施
@@ -21,34 +20,19 @@ def main():
 def ikioiMaesure(setting_uri='setting/ikioi_setting.json'):
     # 設定読み込み
     search_set = readSetting(setting_uri)
-    # 初期化
+    '''
+    初期化
+    '''
     # 検索キーワード
     key_list = search_set.keys()
-    # 結果辞書
+    # 結果用辞書
     ikioi_result = {}
-    # 結果
-    result_set = {}
-    '''
-    ----追記イメージ----
-    "東山奈央":{
-        "2019/04/12_10:00:00":{
-            "scope":"60",
-            "count":"5",
-            "ikioi":"1200.0",
-        }
-        →ここに追加
-        "YYYY/MM/DD_HH:MM:SS":{
-            data
-        }
-    }
-    --------------------
-    '''
-    # key用タイムスタンプ取得
     key_time = getTimestamp()
-    
     for key in key_list:
         search_word = search_set[key]['keyword']
         ikioi_result[search_word] = {key_time:{}}
+    # 結果
+    result_set = []
         
     print(json.dumps(ikioi_result, sort_keys=True, indent=4, ensure_ascii=False))
     
@@ -65,7 +49,7 @@ def ikioiMaesure(setting_uri='setting/ikioi_setting.json'):
         ikioi_result[search_word][key_time] = ikioiCalc(search_setting, result)
         # 結果記録
 #         print(json.dumps(ikioi_result, sort_keys=True, indent=4, ensure_ascii=False))
-        result_set = writeResult(search_setting, ikioi_result[search_word])
+        result_set.append(writeResult(search_setting, ikioi_result[search_word]))
     
     return result_set
 
@@ -78,49 +62,37 @@ def readSetting(setting_uri):
     return json_data
 
 # 設定１つに対して検索を実施する
-def ikioiSearch(set):
+def ikioiSearch(search_set):
     # Twitterのセッションを取得
     twitter = createSession()
     url = 'https://api.twitter.com/1.1/search/tweets.json'
     
-    # 初期化
-    ikioi_target_count = 0
-    
     # 検索設定
-    if set['is_hashtag'] == "True":
-        # hashtag
-        set['keyword'] = '#' + set['keyword']
-    elif set['is_userid'] == "True":
-        # userid
-        set['keyword'] = '@' + set['keyword']
+    if search_set['is_hashtag'] == "True":
+        search_set['keyword'] = '#' + search_set['keyword']
+    elif search_set['is_userid'] == "True":
+        search_set['keyword'] = '@' + search_set['keyword']
     
     params = {
-        'q':set['keyword'],
+        'q':search_set['keyword'],
         'lang':'ja',
         'result_type':'recent',
         'count':100
         }
-    '''
-    ★★★★★こっから★★★★★
-    '''
-    '''
-    old_created_at > scope_dateである間取得
-    取得データを蓄積する
-    '''
-    # 取得したツイートの最古投稿時間
-    old_created_at = True
-    # 対象時刻 (scope)
-    scope_date = True
-    # 取得したツイートの一時記録領域
-    tmp_result = {'created_at':[], 'text':[]}
-    # 取得したツイートの合計件数
-    total_count = 0
     
     '''
     取得部
     '''
-    print('----検索開始')
+    # 取得したツイートの最古投稿時間
+    old_created_at = True
+    # 対象時刻
+    scope_date = True
+    # 取得したツイートの一時データ
+    tmp_result = {'created_at':[], 'text':[]}
+    # 取得したツイートの合計件数
+    total_count = 0
     
+    print('----検索開始')
     while True:
         # 検索実施
         print(params)
@@ -136,11 +108,8 @@ def ikioiSearch(set):
         for tweet_data in res_text['statuses']:
             tmp_result['created_at'].append(tweet_data['created_at'])
             tmp_result['text'].append(tweet_data['text'])
-#             print('--------------------')
-#             print(str(len(tmp_result['created_at'])))
-#             print(tmp_result['created_at'])
-#             print(str(len(tmp_result['text'])))
-        
+
+        # 一時データの末尾インデックスを設定      
         total_count = len(tmp_result['created_at'])
         
         # 最古投稿時間を設定
@@ -150,7 +119,7 @@ def ikioiSearch(set):
         # 現在時刻 (now)
         now_date = dateTimeToParamStr(datetime.now())
         # 対象時刻 (scope)
-        scope_date = dateTimeToParamStr(datetime.now(), minutes=int(set['scope']))
+        scope_date = dateTimeToParamStr(datetime.now(), minutes=int(search_set['scope']))
         
         # 判定出力
         print("取得件数   : " + str(total_count) + "件")
@@ -173,6 +142,8 @@ def ikioiSearch(set):
     '''
     # 結果を絞る
     print('----結果絞り込み')
+    # 計測対象の件数
+    ikioi_target_count = 0
     # 新しいものから順番に読み込み
     # scope内 => スキップ
     # scope外 => 対象数を増加
@@ -183,7 +154,7 @@ def ikioiSearch(set):
         if scope_date > created_at_str:
             # 以降を対象にしない
             break
-        # 計測の対象件数
+        # 計測対象の件数
         ikioi_target_count += 1
     
     return ikioi_target_count
@@ -202,23 +173,22 @@ def ikioiCalc(search_setting, count):
 # 結果をファイルの末尾に追加
 def writeResult(search_setting, report):
     path = 'result/ikioi_report.json'
-     
+    
+    print('----結果書き込み')
     # 読み込み用
     fr = open(path, 'r', encoding='utf-8')
     report_r = json.load(fr)
-    
     report_r[search_setting['keyword']][search_setting['keytime']] = report[search_setting['keytime']]
     
     # 書き込み用
-    print('----結果書き込み')
-    print(json.dumps(report_r, sort_keys=True, indent=4, ensure_ascii=False))
+#     print(json.dumps(report_r, sort_keys=True, indent=4, ensure_ascii=False))
     report_w = open(path, 'w', encoding='utf-8')
     result = json.dump(report_r, report_w, sort_keys=True, indent=4, ensure_ascii=False)
         
     return result
 
 # Twitterから取得できる日付の形式から
-# 比較可能かつ、params['until']に設定可能な形式に変換する
+# 比較可能で、params['until']に設定可能な形式に変換する
 # created_at → %Y-%m-%d_%H:%M:%S_%Z
 def createdAtToParamStr(created_at):
     # 結果時刻 (created_at)
@@ -241,7 +211,7 @@ def createdAtToParamStr(created_at):
     return datetime_str
 
 # datetime型の日付形式を
-# 比較可能かつ、params['until']に設定可能な形式に変換する
+# 比較可能で、params['until']に設定可能な形式に変換する
 # 
 def dateTimeToParamStr(datetime, minutes=0, is_plus=False):
     # タイムゾーンの設定
@@ -265,8 +235,8 @@ def dateTimeToParamStr(datetime, minutes=0, is_plus=False):
 # レポートキーに使用するタイムスタンプを取得する
 def getTimestamp():
     now = datetime.now()
-    format = '%Y/%m/%d_%H:%M:%S'
-    key_timestamp = now.strftime(format)
+    fmt = '%Y/%m/%d_%H:%M:%S'
+    key_timestamp = now.strftime(fmt)
     return key_timestamp
 
 # twitterセッション取得
