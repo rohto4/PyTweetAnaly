@@ -1,19 +1,19 @@
 {
     "0": {
         "keyword":"東山奈央",
-        "scope":"60",
+        "scope":"5",
         "is_hashtag":"False",
         "is_userid":"False"
     },
     "1": {
         "keyword":"ぷよぷよ",
-        "scope":"",
+        "scope":"60",
         "is_hashtag":"False",
         "is_userid":"False"
     },
     "2": {
         "keyword":"フォントの日",
-        "scope":"",
+        "scope":"60",
         "is_hashtag":"True",
         "is_userid":"False"
     }

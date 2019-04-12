@@ -22,20 +22,27 @@ def ikioiMaesure():
     # 設定読み込み
     search_set = readSetting("setting/ikioi_setting.json")
     
-    # 検索処理  設定されたキーワード分繰り返す
+    # 初期化
+    # 検索キーワード
     key_list = search_set.keys()
-    
+    # 結果辞書
+    ikioi_result = {}
+    for key in key_list:
+        ikioi_result[search_set[key]['keyword']] = {}
+
+    # 検索処理  設定されたキーワード分繰り返す
     for key in key_list:
         # 設定１つに対して勢い検索を実施
         result = ikioiSearch(search_set[key])
     
-    # 計算処理
-    ikioi = ikioiCalc(result)
+        # 計算処理
+        # 辞書形式で格納
+        ikioi_result[key] = ikioiCalc(search_set[key], result)
     
     # 結果記録
-    writeResult(ikioi)
+    result = writeResult(ikioi_result)
     
-    return True
+    return result
 
 # 設定ファイル読み込み
 def readSetting(setting_uri):
@@ -52,7 +59,7 @@ def ikioiSearch(set):
     url = 'https://api.twitter.com/1.1/search/tweets.json'
     
     # 初期化
-    ikioi_result = {}
+    ikioi_target_count = 0
     
     # 検索設定
     if set['is_hashtag'] == "True":
@@ -69,48 +76,35 @@ def ikioiSearch(set):
         'count':100
         }
     
-    '''
-    ===================
-    =====テスト用======
-    ===================
-    '''
     # 検索実施
+    print('----検索')
     res = twitter.get(url, params = params)
-    res_text = json.loads(res.text)
-    writer = open('result/tweet.json', 'w', encoding='utf-8')
-    json.dump(res_text, writer, indent=8, ensure_ascii=False)
+    print ('アクセス可能回数 %s' % res.headers['X-Rate-Limit-Remaining'])
+    print ('リセット時間 %s' % res.headers['X-Rate-Limit-Reset'])
     
-    '''
-    ===================
-    =====テスト用======
-    ===================
-    '''
-    # 継続判定
+    res_text = json.loads(res.text)
+#     writer = open('result/tweet.json', 'w', encoding='utf-8')
+#     json.dump(res_text, writer, indent=8, ensure_ascii=False)
+    
+    # 再検索判定
+    print('----再検索判定')
     # 取得件数
     count = len(res_text['statuses'])
-    
-    # 取得結果が時間順に並んでいるか?
-    # jsonファイルのデータ順 = OK
-    # foreachの出力順 = OK
-    # →取得したデータの一番最後の['created_at']で調べればOK
-    
     # 取得した最古投稿時間
     last_get_created_at = res_text['statuses'][count-1]['created_at']
-    
     # 比較可能な形式に整形
     last_created_at = createdAtToParamStr(last_get_created_at)
-    print("created_at : " + last_created_at)
-    
     # 現在時刻 (now)
     now_str = dateTimeToParamStr(datetime.now())
     # 対象時刻 (scope)
     scope_date_str = \
         dateTimeToParamStr(datetime.now(), minutes=int(set['scope']), is_plus=False)
     
+    print("取得件数   : " + str(count) + "件")
+    print("created_at : " + last_created_at)
     print("nowStr     : " + now_str)
     print("scopeStr   : " + scope_date_str)
     
-    sys.exit()
     if scope_date_str <= last_created_at:
         # True => 再検索
         do_research = True
@@ -121,32 +115,66 @@ def ikioiSearch(set):
     
     if do_research == True:
         # 検索範囲が不足している場合、追加で検索
+        print('----再検索実施')
         params['until'] = last_created_at
+        # TODO scopeを広げてテスト
+        print(params)
+        sys.exit()
      
     else:
         # 検索範囲が超過している場合、結果を絞る
-        
+        print('----結果絞り込み')
         # 新しいものから順番に読み込み
         # scope内 => スキップ
-        # scope外 => 以降の要素を消去削除(popitem)
+        # scope外 => 対象数を増加
+        # 
         for data in res_text['statuses']:
-            print('a')
-        
+            created_at_str = createdAtToParamStr(data['created_at'])
+            
+            if scope_date_str > created_at_str:
+                # 以降を対象にしない
+                break
+            # 計測の対象件数
+            ikioi_target_count += 1
     
-    sys.exit()
-    
-    # 件数カウント
-    count = 0
-
-    return ikioi_result
+    return ikioi_target_count
 
 # 勢い計算処理
-def ikioiCalc(data={}):
-    
-    return data
+def ikioiCalc(set, count):
+    record_date = str(datetime.now())
+    ikioi = (1440 / int(set['scope'])) * count
+    ikioi_result = {
+        'report_date':record_date,
+        'keyword':set['keyword'],
+        'scope':set['scope'],
+        'count':count,
+        'ikioi':ikioi,
+        }
+    print(ikioi_result)
+    return ikioi_result
 
-# 結果ファイル書き込み
-def writeResult():
+# 結果をファイルの末尾に追加
+def writeResult(report_list):
+    path = 'result/ikioi_report.json'
+    
+    
+    # TODO 
+    # 読み込み用
+    fr = open(path, 'r', encoding='utf-8')
+    report_r = json.load(fr)
+    
+    # 書き込み用
+    report_w = open(path, 'w', encoding='utf-8')
+    
+    # レポート件数
+    report_count = len(report_r)
+    
+    for report in report_list:
+        report_r.setdefault(report_count, report)
+        report_count += 1
+        print(report_r)
+        
+#     json.dump(report_r, report_w, indent=8, ensure_ascii=False)
     
     return True
 
