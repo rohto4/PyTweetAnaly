@@ -7,7 +7,7 @@
     },
     "1": {
         "keyword": "ぷよぷよ",
-        "scope": "1440",
+        "scope": "360",
         "is_hashtag": "False",
         "is_userid": "False"
     },
@@ -18,8 +18,8 @@
         "is_userid": "False"
     },
     "3": {
-        "keyword": "三森すずこ",
-        "scope": "10",
+        "keyword": "アライさん",
+        "scope": "60",
         "is_hashtag": "False",
         "is_userid": "False"
     }

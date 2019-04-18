@@ -178,6 +178,8 @@ def writeResult(search_setting, report):
     # 読み込み用
     fr = open(path, 'r', encoding='utf-8')
     report_r = json.load(fr)
+    # エラー発生中 TODO
+    # 初回キーワード検索時に、keyが見つからない旨
     report_r[search_setting['keyword']][search_setting['keytime']] = report[search_setting['keytime']]
     
     # 書き込み用
