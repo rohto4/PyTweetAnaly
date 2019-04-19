@@ -1,27 +1,44 @@
+# -*- coding: utf-8 -*-
 '''
 Created on 2019/04/17
 
 @author: Rohto
 '''
-from requests_oauthlib import OAuth1Session
+
 from datetime import datetime
-from dateutil.create_str import dateTimeToParamStr #@UnresolvedImport
+from util.date_util import dateTimeToParam #@UnresolvedImport
+from util.twitter_util import createTwitterSession, checkLimit, setOldDate, setToUserInfo #@UnresolvedImport
+from util.json_util import readCommonSetting, writeBreakStatus, writeJsonData #@UnresolvedImport
 import os
+import json
 
 def main():
     
-    now_str = dateTimeToParamStr(datetime.now())
-    print(now_str)
-#     getAraiList()
+    getAraiList()
 
 def getAraiList():
-    print("アライさんだらけなのだ")
+    '''
+    初期化
+    '''
+    # 結果用
+    user_info = {}              # ユーザ詳細リスト。最終的な成果物。
+    write_break_status = {}     # 中断時の状態を保存
+    # 一時結果用
+    user_list = []              # 成果物に追加したユーザリスト。ユーザ詳細リストのkeyと一致
+    tmp_tweet_list = {}         # 1アクセスで取得したツイートデータ
+    tmp_user_info = {}          # 1アクセスで追加したユーザリストの詳細データ
+    read_break_status = ""      # 中断した日付データ
+
+    # 共通設定
+    twitter = createTwitterSession()
     
+    
+    # 限定設定
     '''
     検索初期設定
     '''
     # 取得したい期間
-    s_period = dateTimeToParamStr(datetime.now(), 60)
+    s_period = dateTimeToParam(datetime.now(), 60)
     # 検索ワード
     s_keyword = 'アライさん'
     # ユーザー名
@@ -65,53 +82,8 @@ def getAraiList():
     #
     #
     #
-    
-# アクセス制限を確認
-# 引っかかれば解除までsleep
-def checkLimit():
-    return True
-    
-# result.user.nameにs_usernameが含まれているか確認
-def checkInTheName():
-    return True
-
-# アライさんリストにユーザ情報を追加
-# ユーザ名 / ユーザ表示ID / 自己紹介 / フォロー数 / フォロワー数
-# フォロワー比率 / @ツイート比率 / 勢い
-def addAraiList():
-    print("アライさんリストに情報を保存")
-    
-
-# フォロワー比率計算
-
-
-# @ツイート比率計算
-
-
-# 勢い計算
-
-
-# 設定読み込み
-# 検索ワード="アライさん"固定
-# 実行日時(いつ実行したか)
-# 最終取得日時(どこまで遡ったか)
-def readSetting():
-    return True
-
-# 結果書き込み
-def writeAraiList():
-    print("結果をexcelか何かに書き込む")
-
-
-# 
-
-
-
-# twitterセッション取得
-def createSession():
-    session = OAuth1Session(os.environ['CONSUMER_KEY'],os.environ['CONSUMER_SECRET'],\
-                            os.environ['ACCESS_KEY'], os.environ['ACCESS_TOKEN_SECRET'])
-    return session
 
 if __name__ == '__main__':
     main()
+
+
