@@ -1,0 +1,26 @@
+{
+    "4": {
+        "keyword": "内田彩",
+        "scope": "720",
+        "is_hashtag": "False",
+        "is_userid": "False"
+    },
+    "5": {
+        "keyword": "テトリス",
+        "scope": "360",
+        "is_hashtag": "False",
+        "is_userid": "False"
+    },
+    "6": {
+        "keyword": "かえるの日",
+        "scope": "360",
+        "is_hashtag": "True",
+        "is_userid": "False"
+    },
+    "7": {
+        "keyword": "新井さん",
+        "scope": "60",
+        "is_hashtag": "False",
+        "is_userid": "False"
+    }
+}

@@ -5,7 +5,7 @@ Created on 2019/04/18
 @author: Rohto
 '''
 from requests_oauthlib import OAuth1Session
-import os, json, datetime, time
+import os, json, datetime, time, sys
 
 # twitterセッション取得
 def createTwitterSession():
@@ -14,11 +14,11 @@ def createTwitterSession():
     return session
 
 # 回数制限を問合せ、アクセス可能になるまで wait する
-def checkLimit(self):
+def checkLimit(session):
     unavailableCnt = 0
     while True:
         url = "https://api.twitter.com/1.1/application/rate_limit_status.json"
-        res = self.session.get(url)
+        res = session.get(url)
         
         if res.status_code == 503:
             # 503 : Service Unavailable
@@ -27,7 +27,7 @@ def checkLimit(self):
             
             unavailableCnt += 1
             print ('Service Unavailable 503')
-            self.waitUntilReset(time.mktime(datetime.datetime.now().timetuple()) + 30)
+            waitUntilReset(time.mktime(datetime.datetime.now().timetuple()) + 30)
             continue
         
         unavailableCnt = 0
@@ -35,43 +35,78 @@ def checkLimit(self):
         if res.status_code != 200:
             raise Exception('Twitter API error %d' % res.status_code)
         
-        remaining, reset = self.getLimitContext(json.loads(res.text))
+        remaining, reset = getLimitContext(json.loads(res.text))
         if (remaining == 0):
-            self.waitUntilReset(reset)
+            waitUntilReset(reset)
         else:
             break
 
+def waitUntilReset(reset):
+    '''
+    reset 時刻まで sleep
+    '''
+    seconds = reset - time.mktime(datetime.datetime.now().timetuple())
+    seconds = max(seconds, 0)
+    print ('\n     =====================')
+    print ('     == waiting %d sec ==' % seconds)
+    print ('     =====================')
+    sys.stdout.flush()
+    time.sleep(seconds + 10)  # 念のため + 10 秒
+    
+def getLimitContext(res_text):
+    '''
+    回数制限の情報を取得 （起動時）
+    '''
+    remaining = res_text['resources']['statuses']['/statuses/user_timeline']['remaining']
+    reset     = res_text['resources']['statuses']['/statuses/user_timeline']['reset']
+    
+    return int(remaining), int(reset)
+
+# アクセス制限情報を表示する
+def showLimit(res):
+    print ('アクセス可能回数 %s' % res.headers['X-Rate-Limit-Remaining'])
+    sec = int(res.headers['X-Rate-Limit-Reset'])\
+               - time.mktime(datetime.datetime.now().timetuple())
+    print ('リセット時間 （残り秒数に換算） %s' % sec)
+    
+    
 # 最古取得日付を設定する
 # 引数はres_text['statuses']を受け取る
-def setOldDate(tweet_list):
-    length = len(tweet_list)
-    last_created_at = tweet_list[length-1]['created_at']
+def getOldDate(tweet_data):
+    length = len(tweet_data)
+    last_created_at = tweet_data['statuses'][length-1]['created_at']
     return last_created_at
 
 # tmp_tweet_list から tmp_user_infoに設定する
 # 一人分
-def setToUserInfo(info):
+def setToUserInfo(tmp_user_info, info, index):
     # tmp_user_info = info[各種情報]
     # 無加工データ
-    tmp_user_info = {}
-    tmp_user_info['id'] = info['id']
-    tmp_user_info['name'] = info['name']
-    tmp_user_info['screen_name'] = info['screen_name']
-    tmp_user_info['friends_count'] = info['friends_count']
-    tmp_user_info['followers_count'] = info['followers_count']
-    tmp_user_info['statuses_count'] = info['statuses_count']
-    tmp_user_info['favourites_count'] = info['favourites_count']
-    tmp_user_info['created_at'] = info['created_at']
-    tmp_user_info['profile_image_url']= info['profile_image_url']
-    tmp_user_info['description'] = info['description']
+    tmp_user_info[str(index)] ={
+        'id' : info['id'],
+        'name' : info['name'],
+        'screen_name' : info['screen_name'],
+        'friends_count' : info['friends_count'],
+        'followers_count' : info['followers_count'],
+        'statuses_count' : info['statuses_count'],
+        'favourites_count' : info['favourites_count'],
+        'created_at' : info['created_at'],
+        'profile_image_url' : info['profile_image_url'],
+        'description' : info['description']
+        }
+    
     # 加工データ
     # フォロー数 / フォロワー数(値が大きい程一方的なフォローが多い)
-    tmp_user_info['followers_rate'] = info['friends_count'] / info['followers_count']
+    if info['friends_count'] != 0 and info['followers_count'] != 0:
+        tmp_user_info[str(index)]['followers_rate'] = info['friends_count'] / info['followers_count']
+    else:
+        tmp_user_info[str(index)]['followers_rate'] = 0
     # いいね数 / Tweet数（値が大きい程いいね数が多い）
-    tmp_user_info['favorites_rate'] = info['favourites_count'] /info['statuses_count']
+    if info['favourites_count'] != 0 and info['statuses_count'] != 0:
+        tmp_user_info[str(index)]['favorites_rate'] = info['favourites_count'] / info['statuses_count']
+    else:
+        tmp_user_info[str(index)]['favorites_rate'] = 0
 
+    print(tmp_user_info)
     return tmp_user_info
-
-
-
 
