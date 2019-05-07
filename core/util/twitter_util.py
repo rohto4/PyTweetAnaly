@@ -110,3 +110,18 @@ def setToUserInfo(tmp_user_info, info, index):
     print(tmp_user_info)
     return tmp_user_info
 
+# status_idで指定したTweetを取得する
+def getTweetById(twitter, status_id):
+    url= 'https://api.twitter.com/1.1/statuses/home_timeline.json'
+    params = {
+        'status_id':status_id,
+        'lang':'ja',
+        'result_type':'recent',
+        'count': 10
+    }
+    res = twitter.get(url, params=params)
+    res_json = json.loads(res.text)
+    print(json.dumps(res_json, sort_keys=True, indent=4, ensure_ascii=False))
+    return res
+
+# urlから
