@@ -112,16 +112,55 @@ def setToUserInfo(tmp_user_info, info, index):
 
 # status_idで指定したTweetを取得する
 def getTweetById(twitter, status_id):
-    url= 'https://api.twitter.com/1.1/statuses/home_timeline.json'
+#     url= 'https://api.twitter.com/1.1/statuses/mentions_timeline.json'
+    url= 'https://api.twitter.com/1.1/statuses/show.json'
     params = {
-        'status_id':status_id,
+        'id':status_id,
         'lang':'ja',
         'result_type':'recent',
-        'count': 10
+        'count': 100
     }
     res = twitter.get(url, params=params)
-    res_json = json.loads(res.text)
-    print(json.dumps(res_json, sort_keys=True, indent=4, ensure_ascii=False))
+#     res_json = json.loads(res.text)
+#     print(json.dumps(res_json, sort_keys=True, indent=4, ensure_ascii=False))
     return res
 
-# urlから
+# in  url
+# out status_id
+def getStatusIdByUrl(url):
+    slash_position = url.rfind('/')
+    status_id = url[slash_position+1:]
+    return status_id
+
+# in res
+# out show_tweet_text
+def showTweetTextAll(res):
+    res_json = json.loads(res.text)
+    
+    for tweet in res_json:
+        print('text : ' + tweet['text'])
+        print('id : ' + tweet['id_str'])
+        print('in_reply_to_status_id : ' + str(tweet['in_reply_to_status_id_str']))
+        print('----------')
+
+# in res
+# out show_tweet_text
+def getAndShowTweet(twitter, url):
+    status_id = getStatusIdByUrl(url)
+    while True:
+        res = getTweetById(twitter, status_id)
+        tweet = json.loads(res.text)
+        
+        print('text : ' + tweet['text'])
+        print('id : ' + tweet['id_str'])
+        
+        if tweet['in_reply_to_status_id_str'] == None:
+            break
+        else:
+            print('in_reply_to_status_id : ' + tweet['in_reply_to_status_id_str'])
+            print('in_reply_to_status_id を使って再検索します')
+            status_id = tweet['in_reply_to_status_id_str']
+        
+        print('----------')
+    
+
