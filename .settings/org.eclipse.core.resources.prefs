@@ -1,7 +1,13 @@
 eclipse.preferences.version=1
+encoding//core/arai_main.py=utf-8
 encoding//core/main.py=utf-8
 encoding//core/result/ikioi_report.json=UTF-8
 encoding//core/result/tweet.json=UTF-8
 encoding//core/setting/ikioi_setting.json=UTF-8
 encoding//core/setting/ikioi_setting_bk.json=UTF-8
+encoding//core/util/date_util.py=utf-8
+encoding//core/util/json_util.py=utf-8
+encoding//core/util/twitter_util.py=utf-8
+encoding//test/test1.json=UTF-8
+encoding//test/test2.json=UTF-8
 encoding/<project>=UTF-8
